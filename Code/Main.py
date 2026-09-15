@@ -11,12 +11,26 @@ import pyttsx3 as tts
 inicializar = tts.init()
 voices = inicializar.getProperty('voices')
 for v in voices:
-    print(v.id, v.name)
+    print(v.id, "-", v.name, "-", v.gender)
 
 print("Volumen actual:", inicializar.getProperty('volume'))
 inicializar.setProperty('volume', 1.0)  # fuerza volumen al máximo
+def escuchar():
+    r = sr.Recognizer()
+    with sr.Microphone() as source:
+        print("Escuchando...")
+        audio = r.listen(source)
+    try:
+        return r.recognize_google(audio, language="es-ES")
+    except sr.UnknownValueError:
+        return ""
+    except sr.RequestError:
+        return ""
 def hablar(texto):
     engine = tts.init()
+    voices = engine.getProperty('voices')
+    engine.setProperty('voice', voices[1].id)  # cambiá el índice [1] según cuál sea la femenina en tu lista
+    engine.setProperty('rate', 165)  # velocidad más pausada/chill (default suele ser ~200)
     engine.say(texto)
     engine.runAndWait()
 def introduction():
@@ -37,11 +51,11 @@ def introduction():
         Ignore = input("¿Quieres ignorar tu edad? ").lower()
         print("Hola, " + Name + "! Bienvenido a Vaini.")
         hablar("Hola, " + Name + "! Bienvenido a Vaini.")
-        with open("user_info.json", "w") as f:
-            json.dump({"name": Name, "age": Age, "ignore": Ignore, "language": language}, f, ensure_ascii=False, indent=2)
         usemicrophone = input("¿Quieres usar el micrófono? (sí/no) ").lower()
+        with open("user_info.json", "w") as f:
+                    json.dump({"name": Name, "age": Age, "ignore": Ignore, "language": language, "usemicrophone": usemicrophone}, f, ensure_ascii=False, indent=2)
         #todo sobre la voz
-        if usemicrophone == "sí" or usemicrophone == "si":
+        if usemicrophone == "sí" or usemicrophone == "yes":
         # inicialr el micorfono
             r = sr.Recognizer()
             with sr.Microphone() as source:
@@ -54,9 +68,9 @@ def introduction():
         Ignore = input("ignore your age ? ").lower()
         print("Hello, " + Name + "! Welcome to Vaini.")
         hablar("Hello, " + Name + "! Welcome to Vaini.")
-        with open("user_info.json", "w") as f:
-            json.dump({"name": Name, "age": Age, "ignore": Ignore, "language": language}, f, ensure_ascii=False, indent=2)
         usemicrophone = input("Do you want to use the microphone? (yes/no) ").lower()
+        with open("user_info.json", "w") as f:
+                    json.dump({"name": Name, "age": Age, "ignore": Ignore, "language": language, "usemicrophone": usemicrophone}, f, ensure_ascii=False, indent=2)
         #todo sobre la voz
         if usemicrophone == "yes":
         # inicialr el micorfono
@@ -100,7 +114,11 @@ def main():
 
     # 4. Loop de conversación
     while True:
-        prompt = input(f"{user_data['name']}: ")
+        if user_data.get("usemicrophone") == "si" or user_data.get("usemicrophone") == "yes":
+            prompt = escuchar()
+            print(f"{user_data['name']}: {prompt}")
+        else:
+            prompt = input(f"{user_data['name']}: ")
         if prompt.lower() == "exit" or prompt.lower() == "salir":
             if user_data["language"] == "es":
                 print("Saliendo del programa. ¡Adiós!")
@@ -108,7 +126,26 @@ def main():
             else:
                 print("Exiting the program. Goodbye!")
                 hablar("bye")
+        #funciones con un prompt especifico, como subir o bajar el volumen, o decir algo especifico funciona sin wifi
+        if prompt == "lunita":
+            print("la mejor perrita del mundo")
             break
+        if prompt == "sube el volumen al maximo".lower():
+            inicializar.setProperty('volume', 1.0)
+            print("Volumen subido al máximo.")
+            hablar("Volumen subido al máximo.")
+        if prompt == "baja el volumen al minimo".lower() or prompt == "haz silencio".lower() or prompt == "silencio".lower() or prompt == "mute".lower() or prompt == "callate".lower():
+            inicializar.setProperty('volume', 0.0)
+            print("Volumen bajado al mínimo.")
+            hablar("Volumen bajado al mínimo.")
+            if prompt == "callate".lower():
+                #probamos traducir segun el idioma del usuario
+                if user_data["language"] == "es":
+                    print("Ok, pero no seas grocero.")
+                    hablar("Ok, pero no seas grocero.")
+                else:
+                    print("Ok, but don't be rude.")
+                    hablar("Ok, but don't be rude.")
         if prompt != "":
             try:
                 response = chat.send_message(prompt)
