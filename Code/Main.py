@@ -12,9 +12,35 @@ inicializar = tts.init()
 voices = inicializar.getProperty('voices')
 for v in voices:
     print(v.id, "-", v.name, "-", v.gender)
-
 print("Volumen actual:", inicializar.getProperty('volume'))
 inicializar.setProperty('volume', 1.0)  # fuerza volumen al máximo
+# definir funcion que actualize el tiempo
+#definir la función para guardar el historial del chat en un archivo JSON
+def cargar_chat():
+    if os.path.exists("chat_history.json"):
+        with open("chat_history.json", "r", encoding="utf-8") as f:
+            chat_history = json.load(f)
+        return chat_history
+    else:
+        return []
+def guardar_chat(chat):
+    chat_history = []
+    for message in chat.history:
+        chat_history.append({
+            #role es el rol del mensaje (usuario o modelo) y parts es una lista de partes del mensaje
+            "role": message.role,
+            #parts es una lista de partes del mensaje, cada parte es un objeto con un atributo text que contiene el texto del mensaje
+            "parts": [parte.text for parte in message.parts]
+        })
+
+    with open("chat_history.json", "w", encoding="utf-8") as f:
+        json.dump(chat_history, f, ensure_ascii=False, indent=2)
+def set_volume(level):
+    if 0.0 <= level <= 1.0:
+        inicializar.setProperty('volume', level)
+        print(f"Volumen ajustado a {level * 100}%")
+    else:
+        print("Nivel de volumen inválido. Debe estar entre 0.0 y 1.0.")
 def escuchar():
     r = sr.Recognizer()
     with sr.Microphone() as source:
@@ -105,13 +131,13 @@ def main():
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel("gemini-3.6-flash")
     context = f"User: {user_data['name']}, Age: {user_data['age']}, Ignore Age: {user_data['ignore']}"
-
+    history = cargar_chat()
     # 3. Recién ahora podemos crear el chat, porque 'model' ya existe
     chat = model.start_chat(history=[
         {"role": "user", "parts": [context]},
         {"role": "model", "parts": ["Entendido, tendré esto en cuenta."]}
+        *history
     ])
-
     # 4. Loop de conversación
     while True:
         if user_data.get("usemicrophone") == "si" or user_data.get("usemicrophone") == "yes":
@@ -126,16 +152,17 @@ def main():
             else:
                 print("Exiting the program. Goodbye!")
                 hablar("bye")
+            break
         #funciones con un prompt especifico, como subir o bajar el volumen, o decir algo especifico funciona sin wifi
         if prompt == "lunita":
             print("la mejor perrita del mundo")
             break
-        if prompt == "sube el volumen al maximo".lower():
-            inicializar.setProperty('volume', 1.0)
+        if prompt.lower() == "sube el volumen al maximo":
+            set_volume(1.0)
             print("Volumen subido al máximo.")
             hablar("Volumen subido al máximo.")
-        if prompt == "baja el volumen al minimo".lower() or prompt == "haz silencio".lower() or prompt == "silencio".lower() or prompt == "mute".lower() or prompt == "callate".lower():
-            inicializar.setProperty('volume', 0.0)
+        if prompt.lower() == "baja el volumen al minimo" or prompt.lower() == "haz silencio" or prompt.lower() == "silencio" or prompt.lower() == "mute" or prompt.lower() == "callate":
+            set_volume(0.0)
             print("Volumen bajado al mínimo.")
             hablar("Volumen bajado al mínimo.")
             if prompt == "callate".lower():
@@ -146,17 +173,19 @@ def main():
                 else:
                     print("Ok, but don't be rude.")
                     hablar("Ok, but don't be rude.")
+        # el mensaje normal a la IA, que requiere wifi
         if prompt != "":
             try:
                 response = chat.send_message(prompt)
                 print("Vaini: " + response.text)
                 hablar(response.text)
+                guardar_chat(chat)
+            # si hay un error, como que no hay wifi, se imprime un mensaje de error
             except Exception as e:
                 if user_data["language"] == "es":
                     print("La IA falló, quizás no tengas wifi. Error:", e)
                 else:
                     print("The AI failed, maybe you don't have wifi. Error:", e)
-    # vemos si el archivo ya existe, si no existe lo creamos y guardamos la info del usuario
 if __name__ == "__main__":
     # Revisamos si el archivo ya existe
     if os.path.exists("user_info.json"):
