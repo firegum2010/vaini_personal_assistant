@@ -35,12 +35,15 @@ def guardar_chat(chat):
 
     with open("chat_history.json", "w", encoding="utf-8") as f:
         json.dump(chat_history, f, ensure_ascii=False, indent=2)
+#funcion para ajustar el volumen del motor de voz
 def set_volume(level):
     if 0.0 <= level <= 1.0:
         inicializar.setProperty('volume', level)
         print(f"Volumen ajustado a {level * 100}%")
     else:
         print("Nivel de volumen inválido. Debe estar entre 0.0 y 1.0.")
+# funcion de escuchar r siendo el reconocedor de voz y source siendo el micrófono,
+#  y configurando el microfono para escuchar y reconocer la voz del usuario, y devolviendo el texto reconocido
 def escuchar():
     r = sr.Recognizer()
     with sr.Microphone() as source:
@@ -52,6 +55,7 @@ def escuchar():
         return ""
     except sr.RequestError:
         return ""
+# recibe el texto lo leee PENDIENTE: que la voz sea mas natural y no suene gringo xd
 def hablar(texto):
     engine = tts.init()
     voices = engine.getProperty('voices')
@@ -59,6 +63,7 @@ def hablar(texto):
     engine.setProperty('rate', 165)  # velocidad más pausada/chill (default suele ser ~200)
     engine.say(texto)
     engine.runAndWait()
+#funcion de introduccion que da la hora, el nombre del usuario y su edad, y le pregunta si quiere usar el microfono
 def introduction():
     #Basic info
     print("Current Working Directory:", os.getcwd())
@@ -108,6 +113,7 @@ def introduction():
                 print("You said: " + r.recognize_google(audio, language="en-US"))
 
     #now the program will actaully start it will use the any input to send to the AI and get a response
+#funcion lit de la union de las demas funciones, que carga la info del usuario, da la hora, configura la API, y empieza el chat
 def main():
     # 0. Load user data from the JSON file siempre de primero
     try:
@@ -135,13 +141,14 @@ def main():
     # 3. Recién ahora podemos crear el chat, porque 'model' ya existe
     chat = model.start_chat(history=[
         {"role": "user", "parts": [context]},
-        {"role": "model", "parts": ["Entendido, tendré esto en cuenta."]}
+        {"role": "model", "parts": ["Entendido, tendré esto en cuenta."]},
         *history
     ])
     # 4. Loop de conversación
     while True:
+        #configuramos el micrófono si el usuario quiere usarlo, y si no, usamos input normal
         if user_data.get("usemicrophone") == "si" or user_data.get("usemicrophone") == "yes":
-            prompt = escuchar()
+            prompt = escuchar() or input(f"{user_data['name']}: ")
             print(f"{user_data['name']}: {prompt}")
         else:
             prompt = input(f"{user_data['name']}: ")
@@ -154,19 +161,22 @@ def main():
                 hablar("bye")
             break
         #funciones con un prompt especifico, como subir o bajar el volumen, o decir algo especifico funciona sin wifi
+        # easter egg de la perrita lunita, que es la mascota de mi bro
         if prompt == "lunita":
             print("la mejor perrita del mundo")
             break
+        #funcion de subir el volumen al maximo y bajar el volumen al maximo
         if prompt.lower() == "sube el volumen al maximo":
             set_volume(1.0)
             print("Volumen subido al máximo.")
             hablar("Volumen subido al máximo.")
+        #funcion de bajar el volumen al minimo y si el usuario dice "callate" le responde que no sea grocero
         if prompt.lower() == "baja el volumen al minimo" or prompt.lower() == "haz silencio" or prompt.lower() == "silencio" or prompt.lower() == "mute" or prompt.lower() == "callate":
             set_volume(0.0)
             print("Volumen bajado al mínimo.")
             hablar("Volumen bajado al mínimo.")
             if prompt == "callate".lower():
-                #probamos traducir segun el idioma del usuario
+                #probamos traducir segun el idioma del usuario y ejemplo de logica pra responder en ingles y español segun el idioma del usuario
                 if user_data["language"] == "es":
                     print("Ok, pero no seas grocero.")
                     hablar("Ok, pero no seas grocero.")
@@ -176,6 +186,7 @@ def main():
         # el mensaje normal a la IA, que requiere wifi
         if prompt != "":
             try:
+                # la respuesta de la IA se guarda en la variable response, y se imprime en pantalla y se lee en voz alta
                 response = chat.send_message(prompt)
                 print("Vaini: " + response.text)
                 hablar(response.text)
@@ -186,6 +197,7 @@ def main():
                     print("La IA falló, quizás no tengas wifi. Error:", e)
                 else:
                     print("The AI failed, maybe you don't have wifi. Error:", e)
+#incio del porgrama, revisa si el archivo user_info.json existe, si no existe, llama a la funcion introduction() y luego a main(), si existe, llama directamente a main()
 if __name__ == "__main__":
     # Revisamos si el archivo ya existe
     if os.path.exists("user_info.json"):
