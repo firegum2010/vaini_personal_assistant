@@ -2,3 +2,6 @@ user_info.json
 .env
 __pycache__
 *.pyc
+try.py
+notas.json
+chat_history.json
