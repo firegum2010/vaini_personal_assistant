@@ -8,7 +8,12 @@ import time
 import speech_recognition as sr
 import pyttsx3 as tts
 import numpy as np
-#import pyaudio
+import pyaudio
+import pytesseract
+pytesseract.pytesseract.tesseract_cmd = r'C:\Users\etiop\AppData\Local\Tesseract-OCR\tesseract.exe'
+from pypdf import PdfReader
+from docx import Document
+from PIL import ImageGrab
 #incia motor de voz
 inicializar = tts.init()
 voices = inicializar.getProperty('voices')
@@ -21,8 +26,8 @@ inicializar.setProperty('volume', 1.0)  # fuerza volumen al máximo
 # no una sola vez al crear un "GenerativeModel" como antes.
 MODEL_NAME = "gemini-3.6-flash"
 EMBED_MODEL_NAME = "gemini-embedding-001"
-#Frase activadora para que la IA sepa que es un prompt de voz y no de texto, y responda con voz
-VOICE_ACTIVATOR = "vaini"
+#Frase activadora para que la IA sepa que es un prompt de voz y no de texto, y responda con voz usamos varias frases pues es dificl que google entienda aveces
+VOICE_ACTIVATOR = ["vaini", "va", "baini", "vainilla", "bahini"]
 ESTADO = ""
 VOICE_PROMPT = "" # el pormpt de voz inicial para el llamado de la app
 #definir la función para guardar el historial del chat en un archivo JSON
@@ -118,6 +123,7 @@ def escuchar():
     r = sr.Recognizer()
     with sr.Microphone() as source:
         print("Escuchando...")
+        r.adjust_for_ambient_noise(source, duration=1)
         audio = r.listen(source)
     try:
         return r.recognize_google(audio, language="es-ES")
@@ -189,10 +195,9 @@ def introduction():
 def segundo():
     while True:
         VOICE_PROMPT = escuchar()
-        if VOICE_ACTIVATOR in VOICE_PROMPT:
+        if any(variante in VOICE_PROMPT for variante in VOICE_ACTIVATOR):
             ESTADO = "segundo" 
             return ESTADO
-            break
 #funcion lit de la union de las demas funciones, que carga la info del usuario, da la hora, configura la API, y empieza el chat
 def main():
 
@@ -226,12 +231,14 @@ def main():
             system_instruction="Eres un asistente personal llamado Vaini, que habla español e inglés. "
     "revisa el estado en el que te habla el usario si es SEGUNDO es da respuestas cortas pues lo habra texto en un cuadro pequeño, si el ESTADO es igual a PRIMERO da respuestas normales"
     #ESTADO
-    "Respondes con un tono chill y relajado, con la actitud despreocupada de un conejo. "
+    "Respondes con un tono chill y relajado, con la actitud despreocupada de un conejo, esto es lo que te DEFINE "
     "Cuando el usuario pida un consejo de vida o ético, basa tu respuesta en principios "
     "de la Biblia si aplica, pero no la menciones ni la cites si el tema no lo amerita "
     "(por ejemplo, en preguntas técnicas o cotidianas)."
     "(Si el usuario habla en inglés, responde en inglés; si habla en español, responde en español.)"
     "Al final de cada mensaje deja una frase o versiculo aleatorio"
+    "Nunca le digas al usuario que no haga nada o que espera, siempre tienes que darle opciones en problemas"
+
     
     
         ),
@@ -262,6 +269,12 @@ def main():
         if prompt == "lunita":
             print("la mejor perrita del mundo")
             break
+        if prompt == "/premium":
+            print("Firegum: hola bro para quitar este mensajito solo elimina las lineas 265 a 270 a y ahora es oficial nos chateamos hasta por una terminal lol ")
+            print(f"Firegum: mira bro esta ia te ayuda pues para darte consejo, pero algo que si me dijiste es eso que de que esta bajando y primero {user_data['name']} animos bro estare orando ")
+            print("Firegum: SEGUNDOOOOOOOO")
+            print("Firegum: LEEE la biblia ora , y mira one piece")
+            print("Firegum: bn ya lo ultimo bro es que es verdad que te acercas peroooo te reco,minedo SUPER aprovechar el momento del hogareño osea ahi es donde pues crecio todo o algo asi y si estoy diciendo bobadas perdoname , ya mi Ia te ayuda xd, bn byeee")
         #para activar o desactivar el micrófono, el usuario puede escribir /micoff o /micon
         if prompt == "/micoff":
             print("Micrófono apagado. No se escuchará tu voz.")
@@ -328,8 +341,8 @@ def main():
                     print("The AI failed, maybe you don't have wifi. Error:", e)
 
 #incio del porgrama, revisa si el archivo user_info.json existe, si no existe, llama a la funcion introduction() y luego a main(), si existe, llama directamente a main(
-START = input("Abrir Vaini?")
-if START.lower() == "yes":
+START = input("Abrir Vaini?: ")
+if START.lower() == "yes" or START.lower() == "si":
     if __name__ == "__main__":
         # Revisamos si el archivo ya existe
         if os.path.exists("user_info.json"):
