@@ -108,6 +108,17 @@ def comparar_embeddings(embedding_actual, embeddings_guardados):
     similitud_sorteada = sorted(similitud, key=lambda x: x[0], reverse=True)
     #devolvemos la nota mas alta similitud, que es la primera en la lista ordenada
     return similitud_sorteada[0][1]["texto"], similitud_sorteada[0][0]  # devuelve el texto y la similitud del embedding más similar
+# funcion para identificar tipo de archivo
+def identificar_archivo(ruta):
+    extension = os.path.splitext(ruta)[1].lower()
+    if extension == ".pdf":
+        return "pdf"
+    elif extension == ".docx":
+        return "docx"
+    elif extension in [".jpg", ".jpeg", ".png", ".bmp"]:
+        return "imagen"
+    else:
+        return "desconocido"
 
 #funcion para ajustar el volumen del motor de voz
 def set_volume(level):
