@@ -1,5 +1,6 @@
 #import some modules
 import os
+import re
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -14,6 +15,7 @@ pytesseract.pytesseract.tesseract_cmd = r'C:\Users\etiop\AppData\Local\Tesseract
 from pypdf import PdfReader
 from docx import Document
 from PIL import ImageGrab
+
 #incia motor de voz
 inicializar = tts.init()
 voices = inicializar.getProperty('voices')
@@ -29,8 +31,9 @@ EMBED_MODEL_NAME = "gemini-embedding-001"
 #Frase activadora para que la IA sepa que es un prompt de voz y no de texto, y responda con voz usamos varias frases pues es dificl que google entienda aveces
 VOICE_ACTIVATOR = ["vaini", "va", "baini", "vainilla", "bahini"]
 ESTADO = ""
-VOICE_PROMPT = "" # el pormpt de voz inicial para el llamado de la app
+VOICE_PROMPT = "" # el prompt de voz inicial para el llamado de la app
 #definir la función para guardar el historial del chat en un archivo JSON
+
 def cargar_chat():
     # Devuelve una lista de types.Content (formato que espera client.chats.create)
     if os.path.exists("chat_history.json"):
@@ -119,7 +122,36 @@ def identificar_archivo(ruta):
         return "imagen"
     else:
         return "desconocido"
-
+def leer_archivos(ruta):
+    tipo = identificar_archivo(ruta)
+    if tipo == "pdf":
+        reader = PdfReader(ruta)
+        texto = ""
+        for page in reader.pages:
+            texto += page.extract_text() + "\n"
+        return texto
+    elif tipo == "docx":
+        doc = Document(ruta)
+        texto = ""
+        for para in doc.paragraphs:
+            texto += para.text + "\n"
+        return texto
+    elif tipo == "imagen":
+        imagen = ImageGrab.grabclipboard()
+        if imagen is not None:
+            texto = pytesseract.image_to_string(imagen, lang='spa')  # Cambia 'spa' a 'eng' si quieres inglés
+            return texto
+        else:
+            return "No se pudo leer la imagen."
+    else:
+        return "Tipo de archivo no soportado."
+def encontrar_rutas_existentes(texto):
+    # Patrón para rutas de Windows y Linux/Mac
+    patron = r'([A-Za-z]:\\(?:[^\\/:*?"<>|\r\n]+\\)*[^\\/:*?"<>|\r\n]*|\/(?:[^\/\r\n]+\/)*[^\/\r\n]*)'
+    rutas = re.findall(patron, texto)
+    # Validar si las rutas existen en el sistema
+    rutas_existentes = [ruta for ruta in rutas if os.path.exists(ruta)]
+    return rutas, rutas_existentes
 #funcion para ajustar el volumen del motor de voz
 def set_volume(level):
     if 0.0 <= level <= 1.0:
@@ -209,6 +241,7 @@ def segundo():
         if any(variante in VOICE_PROMPT for variante in VOICE_ACTIVATOR):
             ESTADO = "segundo" 
             return ESTADO
+
 #funcion lit de la union de las demas funciones, que carga la info del usuario, da la hora, configura la API, y empieza el chat
 def main():
 
@@ -249,6 +282,7 @@ def main():
     "(Si el usuario habla en inglés, responde en inglés; si habla en español, responde en español.)"
     "Al final de cada mensaje deja una frase o versiculo aleatorio"
     "Nunca le digas al usuario que no haga nada o que espera, siempre tienes que darle opciones en problemas"
+
 
     
     
@@ -320,10 +354,16 @@ def main():
         # el mensaje normal a la IA, que requiere wifi
         if prompt != "":
             try:
-                # 1. generamos el embedding del prompt ACTUAL (API NUEVA: conoceme ahora necesita el client)
-                embedding_actual = conoceme(client, prompt)
+                rutas_existentes = encontrar_rutas_existentes(prompt)
+                archi = ""
+                for ruta in rutas_existentes[1]:  # rutas_existentes[1] contiene solo las rutas que existen
+                    archi += leer_archivos(ruta) + "\n"             
+                print(archi)
 
-                # 2. cargamos las notas guardadas HASTA AHORA (antes de agregar la de este turno)
+                # 1. generamos el embedding del prompt ACTUAL (API NUEVA: conoceme ahora necesita el client)
+                embedding_actual = conoceme(client, prompt,)
+
+                # 2. cargamos las notas guardadas HASTA AHO|RA (antes de agregar la de este turno)
                 #    y comparamos el prompt actual contra ellas para encontrar la más relevante
                 embeddings_guardados = cargar_embeddings()
                 texto_relevante, puntaje = comparar_embeddings(embedding_actual, embeddings_guardados)
@@ -336,6 +376,8 @@ def main():
                     prompt_final = prompt
 
                 # 4. recién ahora mandamos el mensaje (con o sin contexto extra) a Gemini
+                if archi != "":
+                    prompt_final += " archivo " + archi
                 response = chat.send_message(prompt_final)
                 print("Vaini: " + response.text)
                 hablar(response.text)
@@ -347,13 +389,13 @@ def main():
             # si hay un error, como que no hay wifi, se imprime un mensaje de error
             except Exception as e:
                 if user_data["language"] == "es":
-                    print("La IA falló, quizás no tengas wifi. Error:", e)
+                    print("La IA falló. Error:", e)
                 else:
-                    print("The AI failed, maybe you don't have wifi. Error:", e)
+                    print("The AI failed. Error:", e)
 
 #incio del porgrama, revisa si el archivo user_info.json existe, si no existe, llama a la funcion introduction() y luego a main(), si existe, llama directamente a main(
 START = input("Abrir Vaini?: ")
-if START.lower() == "yes" or START.lower() == "si":
+if START.lower() == "yes" or START.lower() == "si" or START.lower() == "sí":
     if __name__ == "__main__":
         # Revisamos si el archivo ya existe
         if os.path.exists("user_info.json"):
@@ -375,3 +417,8 @@ else:
 #pendiente: ajustar el umbral de similitud (0.8) según pruebas reales - puede que sea muy alto o muy bajo
 #pendiente: si la librería nueva da algún error en nombres exactos (por ejemplo el modelo de embeddings),
 #  puede que Google haya cambiado el nombre otra vez - revisar el error exacto y ajustar EMBED_MODEL_NAME o MODEL_NAME
+# funciones en categorias
+# funciones del sistema con la terminal
+# funciones del correo
+#funciones de wassaaa
+#funciones de spotify
