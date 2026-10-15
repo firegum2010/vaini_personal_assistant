@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 import json
+import threading
 import time
 import speech_recognition as sr
 import pyttsx3 as tts
@@ -112,6 +113,16 @@ def comparar_embeddings(embedding_actual, embeddings_guardados):
     #devolvemos la nota mas alta similitud, que es la primera en la lista ordenada
     return similitud_sorteada[0][1]["texto"], similitud_sorteada[0][0]  # devuelve el texto y la similitud del embedding más similar
 # funcion para identificar tipo de archivo
+def encontrar_rutas_existentes(texto):
+    extensiones = r"(?:pdf|docx|jpg|jpeg|png|bmp|txt|json|py|md|csv)"
+    # Windows: C:\carpeta\archivo.ext   |   Linux/Mac: /carpeta/archivo.ext
+    patron = (
+        r'[A-Za-z]:\\[^\r\n"<>|?*]*?\.' + extensiones + r'\b'
+        r'|/(?:[^/\r\n"]+/)*[^/\r\n"]*?\.' + extensiones + r'\b'
+    )
+    rutas = [m.group(0) for m in re.finditer(patron, texto, flags=re.IGNORECASE)]
+    rutas_existentes = [ruta for ruta in rutas if os.path.exists(ruta)]
+    return rutas, rutas_existentes
 def identificar_archivo(ruta):
     extension = os.path.splitext(ruta)[1].lower()
     if extension == ".pdf":
@@ -141,17 +152,17 @@ def leer_archivos(ruta):
         if imagen is not None:
             texto = pytesseract.image_to_string(imagen, lang='spa')  # Cambia 'spa' a 'eng' si quieres inglés
             return texto
-        else:
-            return "No se pudo leer la imagen."
+    elif tipo == "desconocido":
+        # esto es para leer otro tipo de archivos
+        try:
+            with open(ruta, 'r', encoding='utf-8') as f:
+                texto = f.read()
+                return texto
+        except Exception as e:  
+            print(f"Error al leer el archivo: {e}")
+            return "No se pudo leer el archivo."
     else:
         return "Tipo de archivo no soportado."
-def encontrar_rutas_existentes(texto):
-    # Patrón para rutas de Windows y Linux/Mac
-    patron = r'([A-Za-z]:\\(?:[^\\/:*?"<>|\r\n]+\\)*[^\\/:*?"<>|\r\n]*|\/(?:[^\/\r\n]+\/)*[^\/\r\n]*)'
-    rutas = re.findall(patron, texto)
-    # Validar si las rutas existen en el sistema
-    rutas_existentes = [ruta for ruta in rutas if os.path.exists(ruta)]
-    return rutas, rutas_existentes
 #funcion para ajustar el volumen del motor de voz
 def set_volume(level):
     if 0.0 <= level <= 1.0:
@@ -355,10 +366,10 @@ def main():
         if prompt != "":
             try:
                 rutas_existentes = encontrar_rutas_existentes(prompt)
+                print(rutas_existentes)
                 archi = ""
                 for ruta in rutas_existentes[1]:  # rutas_existentes[1] contiene solo las rutas que existen
-                    archi += leer_archivos(ruta) + "\n"             
-                print(archi)
+                    archi += leer_archivos(ruta) + "\n"            
 
                 # 1. generamos el embedding del prompt ACTUAL (API NUEVA: conoceme ahora necesita el client)
                 embedding_actual = conoceme(client, prompt,)
