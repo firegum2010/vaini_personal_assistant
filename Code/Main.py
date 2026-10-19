@@ -33,6 +33,7 @@ EMBED_MODEL_NAME = "gemini-embedding-001"
 VOICE_ACTIVATOR = ["vaini", "va", "baini", "vainilla", "bahini"]
 ESTADO = ""
 VOICE_PROMPT = "" # el prompt de voz inicial para el llamado de la app
+FUNCIONES = ["sube el volumen al maximo", "baja el volumen al minimo", "haz silencio", "silencio", "mute", "callate", "/micoff", "/micon", "/vozon", "/vozoff"]
 #definir la función para guardar el historial del chat en un archivo JSON
 
 def cargar_chat():
@@ -188,18 +189,26 @@ def escuchar():
 
 # recibe el texto lo leee PENDIENTE: que la voz sea mas natural y no suene gringo xd
 def hablar(texto):
-    engine = tts.init()
-    voices = engine.getProperty('voices')
-    engine.setProperty('voice', voices[1].id)  # cambiá el índice [1] según cuál sea la femenina en tu lista
-    engine.setProperty('rate', 165)  # velocidad más pausada/chill (default suele ser ~200)
-    engine.say(texto)
-    engine.runAndWait()
-
+    with open("user_info.json", "r", encoding="utf-8") as f:
+        user_data = json.load(f)
+    if user_data.get("listentovaini") == "no":
+        return  # no hace nada si el usuario no quiere escuchar la voz
+    else:
+        engine = tts.init()
+        voices = engine.getProperty('voices')
+        engine.setProperty('voice', voices[1].id)  # cambiá el índice [1] según cuál sea la femenina en tu lista
+        engine.setProperty('rate', 165)  # velocidad más pausada/chill (default suele ser ~200)
+        engine.say(texto)
+        engine.runAndWait()
 #funcion de introduccion que da la hora, el nombre del usuario y su edad, y le pregunta si quiere usar el microfono
 def introduction():
     #Basic info
-    print("Current Working Directory:", os.getcwd())
-    print("Python Version:", os.sys.version)
+    listentovaini = input("Do you want to listen to Vaini? (yes/no) ").lower()
+    if listentovaini == "yes":
+        hablar("Hello, " + Name + "! Welcome to Vaini.")
+    else:
+        print("Hello, " + Name + "! Welcome to Vaini.")
+    
     print("Hello, World!")
     # Asks name and greets the user, and save the info in a json file
     language = input("What language do you want to use? (es/en) ").lower()
@@ -216,7 +225,7 @@ def introduction():
         hablar("Hola, " + Name + "! Bienvenido a Vaini.")
         usemicrophone = input("¿Quieres usar el micrófono? (sí/no) ").lower()
         with open("user_info.json", "w") as f:
-                    json.dump({"name": Name, "age": Age, "ignore": Ignore, "language": language, "usemicrophone": usemicrophone}, f, ensure_ascii=False, indent=2)
+                    json.dump({"name": Name, "age": Age, "ignore": Ignore, "language": language, "usemicrophone": usemicrophone, "listentovaini": listentovaini}, f, ensure_ascii=False, indent=2)
         #todo sobre la voz
         if usemicrophone == "sí" or usemicrophone == "yes":
         # inicialr el micorfono
@@ -233,7 +242,7 @@ def introduction():
         hablar("Hello, " + Name + "! Welcome to Vaini.")
         usemicrophone = input("Do you want to use the microphone? (yes/no) ").lower()
         with open("user_info.json", "w") as f:
-                    json.dump({"name": Name, "age": Age, "ignore": Ignore, "language": language, "usemicrophone": usemicrophone}, f, ensure_ascii=False, indent=2)
+                    json.dump({"name": Name, "age": Age, "ignore": Ignore, "language": language, "usemicrophone": usemicrophone, "listentovaini": listentovaini}, f, ensure_ascii=False, indent=2)
         #todo sobre la voz
         if usemicrophone == "yes":
         # inicialr el micorfono
@@ -243,7 +252,7 @@ def introduction():
                 print("Say something!")
                 audio = r.listen(source)
                 print("You said: " + r.recognize_google(audio, language="en-US"))
-
+        
     #now the program will actaully start it will use the any input to send to the AI and get a response
 
 def segundo():
@@ -293,9 +302,6 @@ def main():
     "(Si el usuario habla en inglés, responde en inglés; si habla en español, responde en español.)"
     "Al final de cada mensaje deja una frase o versiculo aleatorio"
     "Nunca le digas al usuario que no haga nada o que espera, siempre tienes que darle opciones en problemas"
-
-
-    
     
         ),
         history=[
@@ -344,6 +350,19 @@ def main():
                 user_data["usemicrophone"] = "yes"
             else:
                 print("ya esta prendido el microfono")
+        #funcion para que el usuario cambie la configurario de la voz para que suene o no
+        if prompt == "/vozon":
+            if user_data.get("listentovaini") == "no":
+                print("Voz activada. Se escuchará la voz de Vaini.")
+                user_data["listentovaini"] = "yes"
+            else:
+                print("ya esta activada la voz de Vaini")
+        if prompt == "/vozoff":
+            if user_data.get("listentovaini") == "yes":
+                print("Voz desactivada. No se escuchará la voz de Vaini.")
+                user_data["listentovaini"] = "no"
+            else:
+                print("ya esta desactivada la voz de Vaini")s
         #funcion de subir el volumen al maximo y bajar el volumen al maximo
         if prompt.lower() == "sube el volumen al maximo":
             set_volume(1.0)
@@ -363,7 +382,7 @@ def main():
                     print("Ok, but don't be rude.")
                     hablar("Ok, but don't be rude.")
         # el mensaje normal a la IA, que requiere wifi
-        if prompt != "":
+        if prompt != "" and prompt.lower() not in FUNCIONES:
             try:
                 rutas_existentes = encontrar_rutas_existentes(prompt)
                 print(rutas_existentes)
