@@ -333,10 +333,10 @@ def main():
             break
         if prompt == "/premium":
             print("Firegum: hola bro para quitar este mensajito solo elimina las lineas 265 a 270 a y ahora es oficial nos chateamos hasta por una terminal lol ")
-            print(f"Firegum: mira bro esta ia te ayuda pues para darte consejo, pero algo que si me dijiste es eso que de que esta bajando y primero {user_data['name']} animos bro estare orando ")
-            print("Firegum: SEGUNDOOOOOOOO")
-            print("Firegum: LEEE la biblia ora , y mira one piece")
-            print("Firegum: bn ya lo ultimo bro es que es verdad que te acercas peroooo te reco,minedo SUPER aprovechar el momento del hogareño osea ahi es donde pues crecio todo o algo asi y si estoy diciendo bobadas perdoname , ya mi Ia te ayuda xd, bn byeee")
+            print("Firegum: bro estoy triste pues uno por mi hermana que nadaba re joda la verdad y segundo pues porque me di cuneta de algo y pues no es celo es solo como la verdad , osea me di cuenta que le caes mejor a Abigial que yo xdd osea una bobada pero pues mas que eso pensaba mas en que no le importo a casi nadie nose porque mas eso me dio como pena xd y andaba y ando como imbecil pero eso es todo bro y pues la nota del domingo me gustaira que iupiera que estoy trste pero ns y ya ")
+            
+            
+            
         #para activar o desactivar el micrófono, el usuario puede escribir /micoff o /micon
         if prompt == "/micoff":
             print("Micrófono apagado. No se escuchará tu voz.")
@@ -362,7 +362,7 @@ def main():
                 print("Voz desactivada. No se escuchará la voz de Vaini.")
                 user_data["listentovaini"] = "no"
             else:
-                print("ya esta desactivada la voz de Vaini")s
+                print("ya esta desactivada la voz de Vaini")
         #funcion de subir el volumen al maximo y bajar el volumen al maximo
         if prompt.lower() == "sube el volumen al maximo":
             set_volume(1.0)
