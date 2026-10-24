@@ -333,7 +333,7 @@ def main():
             break
         if prompt == "/premium":
             print("Firegum: hola bro para quitar este mensajito solo elimina las lineas 265 a 270 a y ahora es oficial nos chateamos hasta por una terminal lol ")
-            print("broo con lo de 14 yo esa relacion ya la tenia osea bro estabamos bien pero como te digo ella ya le bajo y yo trato de hablarle pero ya no es lo mismo me entendes?, lo de abigail mano, yo nunca dije que vos pensaras eso, solo dije q era una idea mala, pero que esta la idea xd, y mano osea yo no e dicho que me guste abigail ni nada por el estilo solo q e estado como pensando en eso pero bro yo lo que trato es de ayudarte y ve la vrd quero saber si por ejemplo ayer hablaste con ella bastante por wasa? osea era bien o q? osea porque bro hay se puede ver si te considera buen amigo por q si te habla normal y mandandote audios porbablemente si tenga ya mucha confianza con vos y lo unico que puedo decir es q aproveches eso, y mano ya no se que mas decirte, a bueno bro tmb muchas gracias por preocuparte con lo de 14 pero mano primero te recomiendo que te enfoques en vos pq mano andas re triste y ps eso no es que este bien pq no se si te acordas pero enseñaron de tener gozo en las situaciones buenas y malas y bro osea deja de preocuparte tanto orale a Dios y no se que mas xd pero en fin es eso")            
+            print("Bro muchas gracias, el domingo hablamos creo que es importante")            
             
             
         #para activar o desactivar el micrófono, el usuario puede escribir /micoff o /micon
