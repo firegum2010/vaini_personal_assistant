@@ -12,10 +12,12 @@ import pyttsx3 as tts
 import numpy as np
 import pyaudio
 import pytesseract
-pytesseract.pytesseract.tesseract_cmd = r'C:\Users\etiop\AppData\Local\Tesseract-OCR\tesseract.exe'
+if os.name == "nt":
+    #por si el usuario tiene Windows, se le indica la ruta de tesseract.exe
+    pytesseract.pytesseract.tesseract_cmd = r'C:\ruta\a\tesseract.exe'
 from pypdf import PdfReader
 from docx import Document
-from PIL import ImageGrab
+from PIL import Image, ImageGrab
 
 #incia motor de voz
 inicializar = tts.init()
@@ -33,7 +35,20 @@ EMBED_MODEL_NAME = "gemini-embedding-001"
 VOICE_ACTIVATOR = ["vaini", "va", "baini", "vainilla", "bahini"]
 ESTADO = ""
 VOICE_PROMPT = "" # el prompt de voz inicial para el llamado de la app
-FUNCIONES = ["sube el volumen al maximo", "baja el volumen al minimo", "haz silencio", "silencio", "mute", "callate", "/micoff", "/micon", "/vozon", "/vozoff"]
+FUNCIONES = [
+    "sube el volumen al maximo",
+    "baja el volumen al minimo",
+    "haz silencio",
+    "silencio",
+    "mute",
+    "callate",
+    "/micoff",
+    "/micon",
+    "/vozon",
+    "/vozoff",
+    "/premium",
+
+]
 #definir la función para guardar el historial del chat en un archivo JSON
 
 def cargar_chat():
@@ -149,7 +164,7 @@ def leer_archivos(ruta):
             texto += para.text + "\n"
         return texto
     elif tipo == "imagen":
-        imagen = ImageGrab.grabclipboard()
+        imagen = Image.open(ruta)
         if imagen is not None:
             texto = pytesseract.image_to_string(imagen, lang='spa')  # Cambia 'spa' a 'eng' si quieres inglés
             return texto
@@ -158,7 +173,10 @@ def leer_archivos(ruta):
         try:
             with open(ruta, 'r', encoding='utf-8') as f:
                 texto = f.read()
+                if texto.strip() == "":
+                    return "El archivo está vacío."
                 return texto
+            
         except Exception as e:  
             print(f"Error al leer el archivo: {e}")
             return "No se pudo leer el archivo."
@@ -171,7 +189,22 @@ def set_volume(level):
         print(f"Volumen ajustado a {level * 100}%")
     else:
         print("Nivel de volumen inválido. Debe estar entre 0.0 y 1.0.")
+def hablar(texto):
+    try:
+        with open("user_info.json", "r", encoding="utf-8") as f:
+            user_data = json.load(f)
+    except FileNotFoundError:
+        user_data = {}  # todavía no hay archivo: es un usuario nuevo
+    if user_data.get("listentovaini") == "no":
+        return  # no hace nada si el usuario no quiere escuchar la voz
+    else:
+        engine = tts.init()
+        voices = engine.getProperty('voices')
+        engine.setProperty('voice', voices[1].id)
+        engine.setProperty('rate', 165)
+        engine.say(texto)
 
+        engine.runAndWait()
 # funcion de escuchar r siendo el reconocedor de voz y source siendo el micrófono,
 #  y configurando el microfono para escuchar y reconocer la voz del usuario, y devolviendo el texto reconocido
 def escuchar():
@@ -186,29 +219,9 @@ def escuchar():
         return ""
     except sr.RequestError:
         return ""
-
-# recibe el texto lo leee PENDIENTE: que la voz sea mas natural y no suene gringo xd
-def hablar(texto):
-    with open("user_info.json", "r", encoding="utf-8") as f:
-        user_data = json.load(f)
-    if user_data.get("listentovaini") == "no":
-        return  # no hace nada si el usuario no quiere escuchar la voz
-    else:
-        engine = tts.init()
-        voices = engine.getProperty('voices')
-        engine.setProperty('voice', voices[1].id)  # cambiá el índice [1] según cuál sea la femenina en tu lista
-        engine.setProperty('rate', 165)  # velocidad más pausada/chill (default suele ser ~200)
-        engine.say(texto)
-        engine.runAndWait()
 #funcion de introduccion que da la hora, el nombre del usuario y su edad, y le pregunta si quiere usar el microfono
 def introduction():
-    #Basic info
-    listentovaini = input("Do you want to listen to Vaini? (yes/no) ").lower()
-    if listentovaini == "yes":
-        hablar("Hello, " + Name + "! Welcome to Vaini.")
-    else:
-        print("Hello, " + Name + "! Welcome to Vaini.")
-    
+    #Basic info    
     print("Hello, World!")
     # Asks name and greets the user, and save the info in a json file
     language = input("What language do you want to use? (es/en) ").lower()
@@ -223,9 +236,12 @@ def introduction():
         Ignore = input("¿Quieres ignorar tu edad? ").lower()
         print("Hola, " + Name + "! Bienvenido a Vaini.")
         hablar("Hola, " + Name + "! Bienvenido a Vaini.")
+        listentovaini = input("Do you want to listen to Vaini? (yes/no) ").lower()
+        if listentovaini == "yes" or listentovaini == "sí" or listentovaini == "si":
+            hablar("Hello, " + Name + "! Welcome to Vaini.")
+        else:
+            print("Hello, " + Name + "! Welcome to Vaini.")
         usemicrophone = input("¿Quieres usar el micrófono? (sí/no) ").lower()
-        with open("user_info.json", "w") as f:
-                    json.dump({"name": Name, "age": Age, "ignore": Ignore, "language": language, "usemicrophone": usemicrophone, "listentovaini": listentovaini}, f, ensure_ascii=False, indent=2)
         #todo sobre la voz
         if usemicrophone == "sí" or usemicrophone == "yes":
         # inicialr el micorfono
@@ -241,10 +257,11 @@ def introduction():
         print("Hello, " + Name + "! Welcome to Vaini.")
         hablar("Hello, " + Name + "! Welcome to Vaini.")
         usemicrophone = input("Do you want to use the microphone? (yes/no) ").lower()
-        with open("user_info.json", "w") as f:
+        api_key = input("Please enter your Gemini API key: ")
+        with open("user_info.json", "w", encoding="utf-8") as f:
                     json.dump({"name": Name, "age": Age, "ignore": Ignore, "language": language, "usemicrophone": usemicrophone, "listentovaini": listentovaini}, f, ensure_ascii=False, indent=2)
         #todo sobre la voz
-        if usemicrophone == "yes":
+        if usemicrophone == "yes" or usemicrophone == "sí" or usemicrophone == "si":
         # inicialr el micorfono
             r = sr.Recognizer()
 
@@ -252,9 +269,9 @@ def introduction():
                 print("Say something!")
                 audio = r.listen(source)
                 print("You said: " + r.recognize_google(audio, language="en-US"))
+        #return api_key
         
     #now the program will actaully start it will use the any input to send to the AI and get a response
-
 def segundo():
     while True:
         VOICE_PROMPT = escuchar()
@@ -313,7 +330,7 @@ def main():
     # 4. Loop de conversación
     while True:
         #configuramos el micrófono si el usuario quiere usarlo, y si no, usamos input normal
-        if user_data.get("usemicrophone") == "si" or user_data.get("usemicrophone") == "yes":
+        if user_data.get("usemicrophone") == "si" or user_data.get("usemicrophone") == "yes" or user_data.get("usemicrophone") == "sí":
             prompt = escuchar() or input(f"{user_data['name']}: ")
             print(f"{user_data['name']}: {prompt}")
         else:
@@ -333,13 +350,12 @@ def main():
             break
         if prompt == "/premium":
             print("Firegum: hola bro para quitar este mensajito solo elimina las lineas 265 a 270 a y ahora es oficial nos chateamos hasta por una terminal lol ")
-            print("Bro muchas gracias, el domingo hablamos creo que es importante")            
-            
-            
+            print("Firegum: bro hable ocn abigail , mano y pues hoy le conte proque estaba triste y casi en el dia le iba contando, hasta que le conte que me sentia mal por lo ultimo dicho y pues mano ella me cueunta tremenda cosa , primero me dijo ve no le cunetes a nadie y yo le pregunte que si a vos , y me dijo is pero te toca a ti porque no quiero contarselo en persona , asi que pues te ceunto el domingo, pero habalndo la hize llorar, obvio no para mal si no para bien, BROOO ANIMOSSS, estoy orando por vos ")
         #para activar o desactivar el micrófono, el usuario puede escribir /micoff o /micon
         if prompt == "/micoff":
             print("Micrófono apagado. No se escuchará tu voz.")
-            if user_data.get("usemicrophone") == "si" or user_data.get("usemicrophone") == "yes":
+
+            if user_data.get("usemicrophone") == "si" or user_data.get("usemicrophone") == "yes" or user_data.get("usemicrophone") == "sí":
                 user_data["usemicrophone"] = "no"
             else:
                 print("ya esta apagado el microfono")
