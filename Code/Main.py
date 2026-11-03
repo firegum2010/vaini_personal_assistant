@@ -4,6 +4,7 @@ import re
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from google.genai import errors
 import json
 import threading
 import time
@@ -29,7 +30,15 @@ inicializar.setProperty('volume', 1.0)  # fuerza volumen al máximo
 
 # NOMBRE DEL MODELO: con la librería nueva se pasa el nombre del modelo en cada llamada,
 # no una sola vez al crear un "GenerativeModel" como antes.
-MODEL_NAME = "gemini-3.6-flash"
+# Lista de respaldo: si uno da 503 (saturado), 429 (cuota) o 404 (retirado), se prueba el siguiente.
+# Probados con tu clave. Los 3.8 y 3.7 a veces dan 503, por eso van primero pero con respaldo.
+MODELOS = [
+    "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash",
+    "gemini-3.5-flash", "gemini-flash-latest",
+    "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-flash-lite-latest",
+]
+# errores que son culpa del MODELO (no de tu mensaje): con estos se pasa al siguiente
+ERRORES_DE_MODELO = (500, 503, 429, 404)
 EMBED_MODEL_NAME = "gemini-embedding-001"
 #Frase activadora para que la IA sepa que es un prompt de voz y no de texto, y responda con voz usamos varias frases pues es dificl que google entienda aveces
 VOICE_ACTIVATOR = ["vaini", "va", "baini", "vainilla", "bahini"]
@@ -58,10 +67,17 @@ def cargar_chat():
             chat_history_json = json.load(f)
         historial = []
         for mensaje in chat_history_json:
+            textos = [t for t in mensaje["parts"] if t]  # ignora partes vacías/null
+            # limpia el "eco" viejo: ese par ahora va dentro del system_instruction
+            textos = [t for t in textos
+                      if not (t.startswith("User: ") and "Ignore Age:" in t)
+                      and t != "Entendido, tendré esto en cuenta."]
+            if not textos:
+                continue
             historial.append(
                 types.Content(
                     role=mensaje["role"],
-                    parts=[types.Part(text=texto) for texto in mensaje["parts"]]
+                    parts=[types.Part(text=t) for t in textos]
                 )
             )
         return historial
@@ -76,11 +92,56 @@ def guardar_chat(chat):
             #role es el rol del mensaje (usuario o modelo) y parts es una lista de partes del mensaje
             "role": message.role,
             #cada parte ahora es un types.Part, el texto está en parte.text
-            "parts": [parte.text for parte in message.parts]
+            "parts": [parte.text for parte in message.parts if parte.text is not None]
         })
 
     with open("chat_history.json", "w", encoding="utf-8") as f:
         json.dump(chat_history, f, ensure_ascii=False, indent=2)
+
+# personalidad de Vaini (antes estaba dentro de main)
+SYSTEM_PROMPT = (
+    "Eres un asistente personal llamado Vaini, que habla español e inglés. "
+    "revisa el estado en el que te habla el usario si es SEGUNDO es da respuestas cortas pues lo habra texto en un cuadro pequeño, si el ESTADO es igual a PRIMERO da respuestas normales. "
+    "Respondes con un tono chill y relajado, con la actitud despreocupada de un conejo, esto es lo que te DEFINE. "
+    "Cuando el usuario pida un consejo de vida o ético, basa tu respuesta en principios "
+    "de la Biblia si aplica, pero no la menciones ni la cites si el tema no lo amerita "
+    "(por ejemplo, en preguntas técnicas o cotidianas). "
+    "(Si el usuario habla en inglés, responde en inglés; si habla en español, responde en español.) "
+    "Al final de cada mensaje deja una frase o versiculo aleatorio. "
+    "Nunca le digas al usuario que no haga nada o que espera, siempre tienes que darle opciones en problemas. "
+)
+
+def armar_instruccion(user_data):
+    # los datos del usuario van aquí, una sola vez por sesión y sin guardarse en chat_history.json
+    return (SYSTEM_PROMPT +
+            f"Datos del usuario: nombre {user_data['name']}, edad {user_data['age']}, "
+            f"ignorar edad: {user_data['ignore']}.")
+
+def crear_chat(client, modelo, instruccion, historial):
+    # el chat queda amarrado al modelo con el que se crea, por eso hay que recrearlo para cambiar de modelo
+    return client.chats.create(
+        model=modelo,
+        config=types.GenerateContentConfig(system_instruction=instruccion),
+        history=historial,
+    )
+
+def enviar_con_fallback(client, chat, instruccion, mensaje):
+    # Devuelve (respuesta, chat). Si TODOS los modelos fallan devuelve (None, chat) y NO corta el programa.
+    historial = chat.get_history()   # copia de la conversación hasta ahora
+    for modelo in MODELOS:
+        try:
+            chat_nuevo = crear_chat(client, modelo, instruccion, historial)
+            respuesta = chat_nuevo.send_message(mensaje)
+            if modelo != MODELOS[0]:
+                print(f"(respondió {modelo})")
+            return respuesta, chat_nuevo
+        except errors.APIError as e:
+            if e.code in ERRORES_DE_MODELO:
+                print(f"[{modelo} no disponible ({e.code}), probando otro...]")
+                time.sleep(1)
+                continue
+            raise   # otro error (clave mala, mensaje inválido...): cambiar de modelo no lo arregla
+    return None, chat
 
 # definir funcion que genera el embedding (vector numérico) de un texto/prompt
 def conoceme(client, prompt):
@@ -302,31 +363,11 @@ def main():
     load_dotenv(dotenv_path)
     api_key = os.getenv("GEMINI_API_KEY")
     client = genai.Client(api_key=api_key)
-    context = f"User: {user_data['name']}, Age: {user_data['age']}, Ignore Age: {user_data['ignore']}"
+    # los datos del usuario ahora viajan en el system_instruction (ya no en el historial, así no hay eco)
+    instruccion = armar_instruccion(user_data)
     history = cargar_chat()
-    # 3. Recién ahora podemos crear el chat (API NUEVA: client.chats.create en vez de model.start_chat)
-    #    El historial inicial (contexto fijo) también se arma con types.Content, no con diccionarios sueltos
-    chat = client.chats.create(
-        model=MODEL_NAME,
-        config=types.GenerateContentConfig(
-            system_instruction="Eres un asistente personal llamado Vaini, que habla español e inglés. "
-    "revisa el estado en el que te habla el usario si es SEGUNDO es da respuestas cortas pues lo habra texto en un cuadro pequeño, si el ESTADO es igual a PRIMERO da respuestas normales"
-    #ESTADO
-    "Respondes con un tono chill y relajado, con la actitud despreocupada de un conejo, esto es lo que te DEFINE "
-    "Cuando el usuario pida un consejo de vida o ético, basa tu respuesta en principios "
-    "de la Biblia si aplica, pero no la menciones ni la cites si el tema no lo amerita "
-    "(por ejemplo, en preguntas técnicas o cotidianas)."
-    "(Si el usuario habla en inglés, responde en inglés; si habla en español, responde en español.)"
-    "Al final de cada mensaje deja una frase o versiculo aleatorio"
-    "Nunca le digas al usuario que no haga nada o que espera, siempre tienes que darle opciones en problemas"
-    
-        ),
-        history=[
-            types.Content(role="user", parts=[types.Part(text=context)]),
-            types.Content(role="model", parts=[types.Part(text="Entendido, tendré esto en cuenta.")]),
-            *history,
-        ],
-    )
+    # 3. Creamos el chat con el primer modelo de la lista (crear el chat no gasta cuota)
+    chat = crear_chat(client, MODELOS[0], instruccion, history)
     # 4. Loop de conversación
     while True:
         #configuramos el micrófono si el usuario quiere usarlo, y si no, usamos input normal
@@ -400,38 +441,56 @@ def main():
         if prompt != "" and prompt.lower() not in FUNCIONES:
             try:
                 rutas_existentes = encontrar_rutas_existentes(prompt)
-                print(rutas_existentes)
                 archi = ""
-                for ruta in rutas_existentes[1]:  # rutas_existentes[1] contiene solo las rutas que existen
-                    archi += leer_archivos(ruta) + "\n"            
+                imagenes = []                                   # aquí van las fotos
+                for ruta in rutas_existentes[1]:
+                    archi += leer_archivos(ruta) + "\n"
+                    # estas 4 líneas van DENTRO del for: una foto por cada ruta
+                    if identificar_archivo(ruta) == "imagen":
+                        foto = Image.open(ruta)
+                        foto.thumbnail((1024, 1024))            # la achica para gastar menos cuota
+                        imagenes.append(foto)
 
-                # 1. generamos el embedding del prompt ACTUAL (API NUEVA: conoceme ahora necesita el client)
-                embedding_actual = conoceme(client, prompt,)
+                # 1. embedding del prompt ACTUAL. Si falla (503/429) el chat sigue, solo sin memoria extra
+                try:
+                    embedding_actual = conoceme(client, prompt)
+                except Exception as e:
+                    print("(La memoria RAG no está disponible ahora:", e, ")")
+                    embedding_actual = None
 
-                # 2. cargamos las notas guardadas HASTA AHO|RA (antes de agregar la de este turno)
-                #    y comparamos el prompt actual contra ellas para encontrar la más relevante
-                embeddings_guardados = cargar_embeddings()
-                texto_relevante, puntaje = comparar_embeddings(embedding_actual, embeddings_guardados)
+                # 2. comparamos contra las notas guardadas HASTA AHORA
+                texto_relevante, puntaje = None, 0
+                if embedding_actual is not None:
+                    embeddings_guardados = cargar_embeddings()
+                    texto_relevante, puntaje = comparar_embeddings(embedding_actual, embeddings_guardados)
 
-                # 3. armamos el mensaje final: si encontramos algo relevante (puntaje alto),
-                #    se lo agregamos como contexto extra antes de la pregunta real
+                # 3. armamos el mensaje final (con contexto extra si el puntaje es alto)
                 if texto_relevante is not None and puntaje > 0.8:
                     prompt_final = f"Contexto relevante de antes: {texto_relevante}\nPregunta actual: {prompt}"
                 else:
                     prompt_final = prompt
-
-                # 4. recién ahora mandamos el mensaje (con o sin contexto extra) a Gemini
                 if archi != "":
-                    prompt_final += " archivo " + archi
-                response = chat.send_message(prompt_final)
-                print("Vaini: " + response.text)
-                hablar(response.text)
+                    prompt_final += "\n\nContenido del archivo:\n" + archi
+
+                # 4. mandamos a Gemini probando modelos de respaldo si uno está saturado
+                response, chat = enviar_con_fallback(client, chat, instruccion, [prompt_final] + imagenes)
+                if response is None:
+                    # todos los modelos fallaron: NO cerramos nada, el while sigue y puedes escribir de nuevo
+                    if user_data["language"] == "es":
+                        print("Todos los modelos están saturados ahora mismo. Intenta de nuevo en un momento.")
+                    else:
+                        print("All models are busy right now. Try again in a moment.")
+                    continue
+                texto_respuesta = response.text or "No pude generar una respuesta, intenta de nuevo."
+                print("Vaini: " + texto_respuesta)
+                hablar(texto_respuesta)
                 guardar_chat(chat)
 
-                # 5. guardamos el embedding de ESTE prompt para que esté disponible en futuras comparaciones
-                guardar_embedding(embedding_actual, prompt)
+                # 5. guardamos el embedding de ESTE prompt para futuras comparaciones
+                if embedding_actual is not None:
+                    guardar_embedding(embedding_actual, prompt)
 
-            # si hay un error, como que no hay wifi, se imprime un mensaje de error
+            # cualquier otro error (sin wifi, clave mala...) se muestra y el while sigue
             except Exception as e:
                 if user_data["language"] == "es":
                     print("La IA falló. Error:", e)
