@@ -1,0 +1,10 @@
+python-dotenv
+google-genai
+SpeechRecognition
+pyttsx3
+pyaudio
+numpy
+pytesseract
+pypdf
+python-docx
+pillow

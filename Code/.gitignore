@@ -7,3 +7,4 @@ notas.json
 chat_history.json
 try_mic.py
 .venv/
+chat_history_*.json
