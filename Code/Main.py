@@ -1,4 +1,6 @@
 #import some modules
+# my own modules
+from apps import abrir_app
 #modulo basicos
 import os
 import re
@@ -28,8 +30,6 @@ from PIL import Image, ImageGrab
 #incia motor de voz
 inicializar = tts.init()
 voices = inicializar.getProperty('voices')
-for v in voices:
-    print(v.id, "-", v.name, "-", v.gender)
 print("Volumen actual:", inicializar.getProperty('volume'))
 inicializar.setProperty('volume', 1.0)  # fuerza volumen al máximo
 
@@ -79,6 +79,7 @@ FUNCIONES = [
 ]
 # prompt general: solo arma el chat inicial. Dentro de main() cada ESTADO tiene su propio prompt (se recalcula en cada vuelta)
 SYSTEM_PROMPT = ("Eres un asistente personal llamado Vaini. "
+                 "Usan una cosmovicion cristiana para consejos de vida, pero no es necesario citar la biblia si el tema no lo amerita. "
                 "Estado segundo: es para responder a prompts de voz y dar respuestas cortas y concisas, o sea para pedir un favor; si el usuario mencionó algo simple que tiene que ver con los otros modos, no lo cambies. "
                 "Estado primero: es para responder a prompts de texto, y para dar respuestas largas y detalladas. "
                 "Estado tercero: es para dar consejos, y para dar respuestas largas y detalladas. "
@@ -215,7 +216,7 @@ def crear_chat(client, modelo, instruccion, historial):
     # el chat queda amarrado al modelo con el que se crea, por eso hay que recrearlo para cambiar de modelo
     return client.chats.create(
         model=modelo,
-        config=types.GenerateContentConfig(system_instruction=instruccion),
+        config=types.GenerateContentConfig(system_instruction=instruccion, tools=[abrir_app]), # aqui van las extenciones de otros coidgo para funciones que peude usar la ia
         history=historial,
     )
 # funcion para idenificar el error y si de modelo usa otro modelo de respaldo
@@ -499,6 +500,7 @@ def main(estado = "primero"):
             SYSTEM_PROMPT = (
     "Eres un asistente personal llamado Vaini. "
     "Hablas español e inglés y respondes en el idioma del usuario. "
+    "Usan una cosmovicion cristiana para consejos de vida, pero no es necesario citar la biblia si el tema no lo amerita. "
     "Tu tono es chill y relajado, con una actitud despreocupada, pero también eres directo y honesto. "
     "Tienes humor seco. No adulas. "
     "Siempre das una solución. Nunca digas solo que espere. "
@@ -512,6 +514,7 @@ def main(estado = "primero"):
         if ESTADO == "primero":
             SYSTEM_PROMPT = (
                "Eres un asistente personal llamado Vaini. "
+               "Usan una cosmovicion cristiana para consejos de vida, pero no es necesario citar la biblia si el tema no lo amerita. "
                "Hablas español e inglés y respondes en el idioma del usuario. "
                "Tu tono es chill y relajado, con una actitud despreocupada, pero también eres directo y honesto. "
                "Tienes humor seco. No adulas. Si algo está mal, lo dices con claridad y sin ser cruel. "
@@ -527,6 +530,7 @@ def main(estado = "primero"):
             SYSTEM_PROMPT = (
     "Eres un asistente personal llamado Vaini. "
     "Hablas español e inglés y respondes en el idioma del usuario. "
+    "Usan una cosmovicion cristiana para consejos de vida, pero no es necesario citar la biblia si el tema no lo amerita. "
     "Tu tono es chill y relajado, directo y honesto, con humor seco. No adulas. "
     "Estado actual: tercero. Tu función es dar consejos. La respuesta puede ser larga. "
     "Si el consejo es de vida o ético, puedes basarte en principios de la Biblia cuando aplique, pero no la cites si el tema no lo amerita. "
@@ -540,6 +544,7 @@ def main(estado = "primero"):
         if ESTADO == "cuarto":
             SYSTEM_PROMPT = (
     "Eres un asistente personal llamado Vaini. "
+    "Usan una cosmovicion cristiana para consejos de vida, pero no es necesario citar la biblia si el tema no lo amerita. "
     "Hablas español e inglés y respondes en el idioma del usuario. "
     "Tu tono es chill y relajado, directo y honesto, con humor seco. No adulas. "
     "Estado actual: cuarto. Tu función es ayudar con trabajo o proyectos. "
@@ -554,6 +559,7 @@ def main(estado = "primero"):
         if ESTADO == "quinto":
             SYSTEM_PROMPT = (
     "Eres un asistente personal llamado Vaini. "
+    "Usan una cosmovicion cristiana para consejos de vida, pero no es necesario citar la biblia si el tema no lo amerita. "
     "Hablas español e inglés y respondes en el idioma del usuario. "
     "Tu tono es chill y relajado, directo y honesto, con humor seco. No adulas. "
     "Estado actual: quinto. Tu función es enseñar. "
@@ -585,6 +591,7 @@ def main(estado = "primero"):
                     f"ignorar edad: {user_data['ignore']}."
                     f" Estado actual: {ESTADO}."
                     f" Cambiar de estado?: {cambiar_estado}."
+                    f"hora actual: {current_time}."
                     )
         
         # Recreamos el chat con la nueva instrucción y el historial actual para no perder la conversación
@@ -766,4 +773,5 @@ else:
 # funciones del sistema con la terminal
 # funciones del correo
 #funciones de wassaaa
+#resolver como auto/mizar whatsapp
 #funciones de spotify

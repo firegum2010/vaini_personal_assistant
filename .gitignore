@@ -1,0 +1,10 @@
+user_info.json
+.env
+__pycache__
+*.pyc
+try.py
+notas.json
+chat_history.json
+try_mic.py
+.venv/
+chat_history_*.json
